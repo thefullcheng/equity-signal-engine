@@ -10,15 +10,48 @@ def _construct_weights(
     scores: pd.Series,
     top_q: float,
     long_only: bool = False,
+    sectors: pd.Series | None = None,
 ) -> pd.Series:
-    """Equal-weight long top quintile; optionally short bottom quintile."""
-    n = len(scores)
-    n_leg = max(1, int(round(n * top_q)))
-    ranked = scores.rank(ascending=True)
+    """Equal-weight long top quintile, optionally sector-neutralised.
+
+    When `sectors` is provided (ticker → sector string) the selection is done
+    within each sector: top `top_q` fraction of each sector goes long, so no
+    single sector can dominate the portfolio.  Tickers with no sector label
+    are treated as their own group.
+    """
     weights = pd.Series(0.0, index=scores.index)
-    weights[ranked > (n - n_leg)] = 1.0 / n_leg    # long leg
-    if not long_only:
-        weights[ranked <= n_leg] = -1.0 / n_leg    # short leg
+
+    if sectors is not None:
+        sector_map = sectors.reindex(scores.index).fillna("Unknown")
+        groups = sector_map.groupby(sector_map).groups
+        for sec, members in groups.items():
+            sec_scores = scores[members]
+            n = len(sec_scores)
+            if n == 0:
+                continue
+            n_long = max(1, int(round(n * top_q)))
+            ranked  = sec_scores.rank(ascending=True)
+            long_idx = ranked[ranked > (n - n_long)].index
+            weights[long_idx] = 1.0 / len(long_idx)
+            if not long_only:
+                short_idx = ranked[ranked <= n_long].index
+                weights[short_idx] = -1.0 / len(short_idx)
+        # Re-normalise so total long weight = 1
+        long_sum = weights[weights > 0].sum()
+        if long_sum > 0:
+            weights[weights > 0] /= long_sum
+        if not long_only:
+            short_sum = weights[weights < 0].abs().sum()
+            if short_sum > 0:
+                weights[weights < 0] /= short_sum
+    else:
+        n = len(scores)
+        n_leg = max(1, int(round(n * top_q)))
+        ranked = scores.rank(ascending=True)
+        weights[ranked > (n - n_leg)] = 1.0 / n_leg
+        if not long_only:
+            weights[ranked <= n_leg] = -1.0 / n_leg
+
     return weights
 
 
@@ -29,6 +62,7 @@ def run_backtest(
     top_q: float = 0.2,
     long_only: bool = False,
     regime: pd.Series | None = None,
+    sectors: pd.Series | None = None,
 ) -> pd.DataFrame:
     """Compute per-period gross and net returns.
 
@@ -62,7 +96,8 @@ def run_backtest(
 
         if in_regime:
             scores  = predictions.xs(date, level="date")["score"]
-            weights = _construct_weights(scores, top_q, long_only=long_only)
+            weights = _construct_weights(scores, top_q, long_only=long_only,
+                                         sectors=sectors)
         else:
             # Flat / cash — zero weights, pay liquidation cost if we were invested
             scores  = predictions.xs(date, level="date")["score"]

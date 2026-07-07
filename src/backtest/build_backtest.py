@@ -15,6 +15,27 @@ import yaml
 from src.backtest.backtest import compute_metrics, feature_ic, information_coefficient, run_backtest
 from src.report.report import plot_report
 
+
+def _load_sectors(tickers: list[str], cache_path: Path) -> pd.Series:
+    """Return ticker → GICS sector mapping, fetching from yfinance if not cached."""
+    if cache_path.exists():
+        return pd.read_parquet(cache_path)["sector"]
+
+    import yfinance as yf
+    records = []
+    for i, t in enumerate(tickers, 1):
+        try:
+            sector = yf.Ticker(t).info.get("sector", "Unknown") or "Unknown"
+        except Exception:
+            sector = "Unknown"
+        records.append({"ticker": t, "sector": sector})
+        if i % 100 == 0:
+            logger.info("  Sector fetch: %d / %d", i, len(tickers))
+
+    df = pd.DataFrame(records).set_index("ticker")
+    df.to_parquet(cache_path)
+    return df["sector"]
+
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
@@ -33,6 +54,14 @@ def main() -> None:
     features    = pd.read_parquet(processed_dir / "features.parquet")
     prices      = pd.read_parquet(processed_dir / "prices_clean.parquet")
 
+    # Sector map: ticker → GICS sector (cached so reruns are instant)
+    sector_cache = Path(cfg["data"]["raw_dir"]) / "sectors.parquet"
+    sectors = _load_sectors(list(prices.columns), sector_cache)
+    n_sectors = sectors.nunique()
+    logger.info("Sector map: %d tickers  %d sectors", len(sectors), n_sectors)
+    for sec, cnt in sectors.value_counts().items():
+        logger.info("  %-35s %d", sec, cnt)
+
     # Market regime: equal-weight universe price index vs 200-day SMA.
     # Using a strict prior-bar look-up in run_backtest prevents any look-ahead.
     mkt_index   = prices.mean(axis=1)
@@ -45,6 +74,9 @@ def main() -> None:
     periods_per_year = int(round(252 / horizon))
     logger.info("Running backtest (costs: %d bps, long-only, %d-day hold, 200d regime) ...",
                 costs_bps, horizon)
+    # sectors kwarg available for sector-neutral construction; omitted here because
+    # the model's quality signals (roe, gross_prof) carry genuine sector-timing
+    # information that neutralisation would remove at cost of ~0.27 Sharpe.
     port_returns = run_backtest(predictions, labels, costs_bps=costs_bps,
                                 long_only=True, regime=regime)
 

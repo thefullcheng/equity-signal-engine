@@ -52,6 +52,30 @@ def test_weights_long_leg_positive_short_leg_negative():
     assert weights["A"] < 0     # lowest score → short
 
 
+def test_sector_neutral_long_weights_sum_to_one():
+    """Sector-neutral long weights must still sum to 1."""
+    tickers = list("ABCDEFGHIJ")
+    scores  = pd.Series(np.arange(10, dtype=float), index=tickers)
+    sectors = pd.Series(
+        ["Tech"] * 5 + ["Finance"] * 5, index=tickers
+    )
+    weights = _construct_weights(scores, top_q=0.2, long_only=True, sectors=sectors)
+    assert abs(weights[weights > 0].sum() - 1.0) < 1e-9
+
+
+def test_sector_neutral_selects_within_each_sector():
+    """Best scorer in each sector must be selected, worst must not."""
+    tickers = list("ABCD")
+    # A, B → Tech;  C, D → Finance
+    scores  = pd.Series([1.0, 4.0, 2.0, 3.0], index=tickers)  # B best tech, D best finance
+    sectors = pd.Series(["Tech", "Tech", "Finance", "Finance"], index=tickers)
+    weights = _construct_weights(scores, top_q=0.5, long_only=True, sectors=sectors)
+    assert weights["B"] > 0    # best in Tech
+    assert weights["D"] > 0    # best in Finance
+    assert weights["A"] == 0   # worst in Tech
+    assert weights["C"] == 0   # worst in Finance
+
+
 # ---------------------------------------------------------------------------
 # run_backtest
 # ---------------------------------------------------------------------------
