@@ -13,6 +13,7 @@ import pandas as pd
 import yaml
 
 from src.backtest.backtest import compute_metrics, feature_ic, information_coefficient, run_backtest
+from src.report.attribution import print_attribution
 from src.report.report import plot_report
 
 
@@ -107,6 +108,9 @@ def main() -> None:
     excess_ann = metrics["ann_return"] - bmark_ann
     logger.info("Equal-weight benchmark ann return: %.4f", bmark_ann)
     logger.info("Ann excess return vs benchmark:    %.4f", excess_ann)
+
+    print_attribution(port_returns, predictions, sectors,
+                      periods_per_year=periods_per_year)
 
     bt_path = processed_dir / "backtest.parquet"
     port_returns.to_parquet(bt_path)
