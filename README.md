@@ -5,8 +5,12 @@ universe, with an overfitting-resistant walk-forward backtest.
 
 ## Status
 - [x] Phase 2a: point-in-time universe construction (`src/data/universe.py`)
-- [ ] Phase 2b: price ingestion + coverage audit
-- [ ] Phase 2c: cleaning & panel alignment
+- [x] Phase 2b: price ingestion + coverage audit (`src/data/prices.py`)
+- [x] Phase 2c: cleaning & panel alignment (`src/data/clean.py`)
+- [x] Phase 3a: cross-sectional features — mom, vol, RSI, dollar-vol (`src/features/`)
+- [x] Phase 3b: 5-day forward return labels (`src/labels/`)
+- [x] Phase 3c: walk-forward LightGBM model (`src/models/`)
+- [x] Phase 3d: long-short backtest + report (`src/backtest/`, `src/report/`)
 
 ## Quickstart
 ```bash

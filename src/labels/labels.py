@@ -1,0 +1,35 @@
+"""Forward return labels for cross-sectional prediction."""
+
+from __future__ import annotations
+
+import numpy as np
+import pandas as pd
+
+
+def forward_returns(prices: pd.DataFrame, horizon: int = 5) -> pd.DataFrame:
+    """horizon-day log return at each date: log(price[T+horizon] / price[T]).
+
+    Last ``horizon`` rows are NaN (no future prices available). NaN prices
+    (non-membership periods) propagate naturally so the membership mask flows
+    through to the label layer without extra masking logic.
+    """
+    return np.log(prices / prices.shift(horizon)).shift(-horizon)
+
+
+def build_label_panel(
+    prices: pd.DataFrame,
+    dates: pd.DatetimeIndex,
+    horizon: int = 5,
+) -> pd.DataFrame:
+    """Forward returns on rebalance dates as (date, ticker) MultiIndex.
+
+    NaN labels are dropped; observations without a known realized return must
+    never enter training or backtest evaluation.
+    """
+    fwd = forward_returns(prices, horizon=horizon).loc[dates]
+    fwd.index.name = "date"
+    s = fwd.stack(future_stack=True)
+    s.name = "fwd_return"
+    out = s.to_frame()
+    out.index.names = ["date", "ticker"]
+    return out.dropna()
