@@ -1,0 +1,27 @@
+# Central configuration. Every experiment knob lives here so runs are
+# reproducible from config + code alone (no magic constants in notebooks).
+
+universe:
+  # "dev"  -> top-N by trailing dollar volume within point-in-time membership
+  # "full" -> all point-in-time S&P 500 members
+  mode: dev
+  dev_top_n: 100
+  # Change-log trust floor: membership before this date is approximated as
+  # "member since floor" for tickers with no observed addition event.
+  floor_date: "2010-01-01"
+
+dates:
+  start: "2010-01-01"
+  end: null            # null = today at download time (recorded in metadata)
+
+data:
+  raw_dir: data/raw
+  processed_dir: data/processed
+  wikipedia_cache: data/raw/wikipedia
+
+# Populated in later phases:
+labels:
+  horizon_days: 5      # weekly, non-overlapping rebalance
+
+costs:
+  per_side_bps: 10     # base case; sensitivity run at [5, 10, 20]
