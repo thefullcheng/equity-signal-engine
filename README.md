@@ -15,6 +15,7 @@ universe with an overfitting-resistant walk-forward backtest.
 [Sensitivity summary](#sensitivity-summary) ·
 [Quickstart](#quickstart) ·
 [Key design decisions](#key-design-decisions) ·
+[Live paper-trading protocol](#live-paper-trading-evaluation-protocol-pre-registered) ·
 [Survivorship bias handling](#survivorship-bias-handling)
 
 ## Results (as of latest run)
@@ -359,6 +360,7 @@ engineered from a result.
 - [x] **6o** Block-bootstrap CI on the headline excess-return/Sharpe-gap claims — see Statistical significance
 - [x] **6p** Sector exposure table + re-verified sector-neutral Sharpe cost (0.54 -> 0.135 on the current model) — see Sector exposure
 - [x] **6q** Benchmark hit rate, precise cost-drag math, log-scale equity curve, table of contents
+- [x] **6r** Pre-registered the live paper-trading evaluation protocol (horizon, metrics, confirmation/failure criteria) before any checkpoint was assessed
 
 ## Feature set (5 features, all rank-normalised cross-sectionally)
 
@@ -477,6 +479,47 @@ nearly 2x Sharpe spread (0.54–0.89) purely from which 100 companies happen to
 be in the sample. Dev mode was never a stable estimate of anything, for any
 100-ticker subset — full mode is the only credible number to report; dev mode
 is for fast local iteration only.
+
+## Live paper-trading evaluation protocol (pre-registered)
+
+Two Alpaca paper accounts have been running since **2026-07-08**: one
+tracking the full model's top-20, one tracking the momentum-only baseline
+(`src/trading/`, `--strategy model|momentum`). Writing the evaluation
+criteria down now, before any live checkpoint has been assessed, so the
+conclusion isn't fitted to whatever the data happens to show.
+
+**Evaluation horizon**: 12 months, **2026-07-08 to 2027-07-08** (~13
+rebalance cycles at the 20-trading-day schedule).
+
+**Metrics tracked**: cumulative return spread (model account vs. momentum
+account — the direct, paired, same-market-conditions comparison), live IC
+(model's predicted score vs. realized forward return, computed each
+rebalance), realized turnover (sanity check against the backtest's 40.2%),
+and any operational failures (data pipeline breaks, execution slippage).
+
+**What would count as confirmation, and what wouldn't.** Given everything
+above — factor-regression alpha significantly *negative* (t=-4.79), the
+excess-return and Sharpe-gap bootstrap CIs both spanning zero on 169
+backtest periods — the honest prior going into this live test is that the
+model has **no expected edge over the momentum baseline**. With only ~13
+live periods (a fraction of the 169 that still couldn't rule out noise),
+this test cannot by itself confirm or refute a stock-picking edge with any
+statistical confidence — that would need years of live data, not one. So:
+
+- **The model account outperforming the momentum account over 12 months is
+  NOT, by itself, evidence of skill.** Given the small sample, a wide
+  performance gap in either direction is well within plausible noise.
+- **What this live run can actually check**: does execution behave as the
+  backtest predicts (turnover near 40%, no operational surprises), and is
+  the qualitative pattern (which account does better, by how much) at least
+  *consistent with* — not contradicted by — the backtest's own conclusion
+  of no significant edge. A dramatic, sustained divergence either way would
+  be worth investigating, not immediately believing.
+- **Success for this project was never "the model account makes more
+  money."** It's an honest, well-calibrated backtest whose live behavior
+  doesn't contradict what the backtest itself already concluded. If the two
+  accounts track closely, or diverge in ways too small to distinguish from
+  noise, that's the expected, confirming outcome — not a null result.
 
 ## Survivorship bias handling
 
