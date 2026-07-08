@@ -45,10 +45,11 @@ Two things this shows plainly:
    (c)→(d) both lose Sharpe. It was originally intended as a risk-reducing
    market-timing overlay; once built on a correct equal-weight *return* index
    (see below), it doesn't earn its keep. It's not used by default.
-2. **The model has a real, if modest, edge over passive** — (c) beats (a) by
-   both Sharpe and absolute return. That's the actual claim this project can
-   support: a weak but genuine cross-sectional signal, not "trend-filtered
-   index fund with extra steps."
+2. **The model beats passive buy-and-hold on this specific historical sample**
+   — (c) beats (a) by both Sharpe and absolute return. Whether that's a real,
+   generalizable edge or a good draw from noise is a separate question — see
+   **Statistical significance** below, where the honest answer is "not
+   confidently distinguishable from luck."
 
 **A bug this decomposition surfaced**: the original regime filter averaged
 raw *price levels* across the universe (`prices.mean(axis=1)`) rather than
@@ -58,6 +59,44 @@ $500 stock moved it 100x more than a $5 stock for the same % move). Fixed in
 200-day window — which happened to sit at the top of its own sensitivity
 sweep under the old (buggy) index — no longer looks favorable at any window;
 see **Sensitivity summary**.
+
+## Statistical significance: is this distinguishable from luck?
+
+**Momentum-only baseline.** A naive 12-1 month momentum sort (no model, no
+fundamentals, no LightGBM) over the identical 169 periods:
+
+| | IC t-stat | Sharpe | CAGR |
+|---|---|---|---|
+| Momentum-only (single feature) | 0.62 | 0.653 | 9.6% |
+| Full model (5 features + LightGBM) | 0.48 | 0.665 | 10.0% |
+
+The entire pipeline — EDGAR fundamentals, feature engineering, walk-forward
+LightGBM — earns essentially a rounding error over sorting by trailing
+12-month return alone, and has *lower* IC doing it. This is the honest
+complexity-vs-payoff comparison an interviewer would run in their head.
+
+**Permutation null test.** Shuffled which ticker gets which predicted score
+within each rebalance date (destroying any real score↔outcome relationship
+while preserving the cross-sectional and time-series structure), recomputed
+IC, repeated 2,000 times to build a null distribution:
+
+| | Value |
+|---|---|
+| Observed IC mean | +0.0050 |
+| Null distribution mean | +0.0001 (centered at ~0, as expected) |
+| Null distribution std | 0.0036 |
+| **Empirical p-value** (P(null IC ≥ observed)) | **0.089** |
+| Observed IC's percentile in the null | 91st |
+
+**This does not clear conventional significance (p < 0.05).** The observed
+IC is directionally positive and beats ~91% of random permutations, but a
+p-value of 0.089 means we can't confidently rule out that this is a good
+draw from noise rather than genuine, generalizable predictive skill. Combined
+with the momentum-only comparison above, the fair summary of this whole
+project is: **rigorous, correctly-built infrastructure (point-in-time
+universe, walk-forward validation, EDGAR integration) surfacing a weak signal
+that is suggestive but not statistically confirmed** — not a validated
+trading edge.
 
 ## Phases completed
 
@@ -81,6 +120,7 @@ see **Sensitivity summary**.
 - [x] **6e** Alpaca paper-trading integration (`src/trading/`) — dry-run by default, equal-weight rebalance to the model's top-N
 - [x] **6f** Fixed walk-forward embargo gap — see Key design decisions
 - [x] **6g** Dev-mode robustness test against random 100-ticker subsets — see Dev mode section
+- [x] **6h** Momentum-only baseline and permutation null test — see Statistical significance
 
 ## Feature set (5 features, all rank-normalised cross-sectionally)
 
@@ -197,12 +237,6 @@ is for fast local iteration only.
 
 ## Known limitations (not yet addressed)
 
-- **No formal null baseline.** With IC this weak, a permutation/Monte Carlo
-  null (shuffle labels, rerun, see where the actual IC falls) would give a
-  real p-value instead of relying on a t-stat that assumes independent
-  periods. Not yet built.
-- **No momentum-only baseline** (e.g. a plain 12-1 sort) to compare the full
-  model against a simple, well-known factor.
 - **Feature pruning was in-sample.** Both the original 8→5 trim this session
   and the earlier Phase 4b pruning were decided using IC measured over the
   *same* 2013–2026 span the backtest reports performance over — textbook
