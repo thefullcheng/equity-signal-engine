@@ -115,8 +115,14 @@ def main() -> None:
     logger.info("Wrote %s", bt_path)
 
     report_path = processed_dir / "report.png"
-    plot_report(port_returns, ic, metrics, report_path)
+    plot_report(port_returns, ic, metrics, report_path, benchmark_returns=bmark)
     logger.info("Wrote %s", report_path)
+
+    # Also save a checked-in copy for the README (data/processed/ is gitignored)
+    docs_path = Path("docs/equity_curve.png")
+    docs_path.parent.mkdir(parents=True, exist_ok=True)
+    plot_report(port_returns, ic, metrics, docs_path, benchmark_returns=bmark)
+    logger.info("Wrote %s", docs_path)
 
 
 if __name__ == "__main__":

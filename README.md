@@ -1,9 +1,15 @@
 # Equity Signal Engine
 
+[![tests](https://github.com/paulywally123/equity-signal-engine/actions/workflows/tests.yml/badge.svg)](https://github.com/paulywally123/equity-signal-engine/actions/workflows/tests.yml)
+
 Cross-sectional monthly long-only equity strategy on a point-in-time S&P 500
 universe with an overfitting-resistant walk-forward backtest.
 
 ## Results (as of latest run)
+
+*Reproduce these exact numbers*: `config/config.yaml` with `universe.mode: full`,
+price/fundamentals data snapshot dated 2026-07-08, `python -m src.backtest.build_backtest`.
+Numbers will drift on a fresh data pull as prices/fundamentals update.
 
 | Metric | Value |
 |---|---|
@@ -12,10 +18,13 @@ universe with an overfitting-resistant walk-forward backtest.
 | Ann. volatility | 16.5% |
 | Max drawdown | -31.4% |
 | Hit rate | 67.5% |
+| Avg turnover (per rebalance / annualized) | 40.2% / 523% |
 | IC (model vs realized) | +0.0050 (t = 0.48) |
 | Excess return vs equal-weight BM | +1.46% / yr |
 | Backtest period | 2013 – 2026 (169 periods) |
 | Universe | Full point-in-time S&P 500 (607 current members, 814 ever-members) |
+
+![Equity curve, drawdown, and IC over time](docs/equity_curve.png)
 
 Strategy: long top-20% by model score, 20-day rebalance, no market-timing
 overlay, 10 bps per-side transaction costs. **No short leg** — the long-short

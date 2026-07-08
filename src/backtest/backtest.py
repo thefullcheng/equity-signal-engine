@@ -144,6 +144,7 @@ def run_backtest(
             "long_return":  long_ret,
             "short_return": short_ret,
             "in_regime":    in_regime,
+            "turnover":     turnover,
         })
         prev_weights = weights
 
@@ -159,7 +160,7 @@ def compute_metrics(port_returns: pd.DataFrame, periods_per_year: int = 52) -> d
     cum     = (1 + r).cumprod()
     max_dd  = ((cum - cum.cummax()) / cum.cummax()).min()
     cagr    = cum.iloc[-1] ** (periods_per_year / len(r)) - 1
-    return {
+    metrics = {
         "ann_return":   round(ann_ret, 4),
         "ann_vol":      round(ann_vol, 4),
         "sharpe":       round(sharpe,  3),
@@ -168,6 +169,11 @@ def compute_metrics(port_returns: pd.DataFrame, periods_per_year: int = 52) -> d
         "hit_rate":     round((port_returns["gross_return"] > 0).mean(), 4),
         "n_periods":    len(r),
     }
+    if "turnover" in port_returns.columns:
+        avg_turnover = port_returns["turnover"].mean()
+        metrics["avg_turnover"]    = round(avg_turnover, 4)
+        metrics["annual_turnover"] = round(avg_turnover * periods_per_year, 4)
+    return metrics
 
 
 def information_coefficient(
