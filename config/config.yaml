@@ -4,7 +4,7 @@
 universe:
   # "dev"  -> top-N by trailing dollar volume within point-in-time membership
   # "full" -> all point-in-time S&P 500 members
-  mode: dev
+  mode: full
   dev_top_n: 100
   # Change-log trust floor: membership before this date is approximated as
   # "member since floor" for tickers with no observed addition event.
