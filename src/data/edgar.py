@@ -92,9 +92,11 @@ def _extract_concept(
         df["filed"] = pd.to_datetime(df["filed"])
         # Keep only annual (12-month) periods to avoid double-counting interim filings
         df["months"] = ((df["end"] - df["end"].shift(1)).dt.days / 30).round()
-        # For 10-Qs we want the most-recent quarterly value, not YTD cumulative.
-        # Use frame/accn to filter to point-in-time distinct periods.
-        df = df.drop_duplicates(subset=["end"], keep="last")
+        # A given period can appear in several later filings as a prior-year
+        # comparative (e.g. a 10-K's five-year selected financial data table).
+        # Keep the earliest filing — the original report — not the latest
+        # restatement, so 'filed' reflects true first public availability.
+        df = df.sort_values("filed").drop_duplicates(subset=["end"], keep="first")
         return df[["end", "filed", "val"]].sort_values("end").reset_index(drop=True)
     return None
 
