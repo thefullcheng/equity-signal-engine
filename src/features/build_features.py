@@ -19,6 +19,43 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
 
+def _join_ranked_panel(features: pd.DataFrame, panel_path: Path, label: str) -> pd.DataFrame:
+    """Rank-normalize each column of a (date, ticker) panel cross-sectionally
+    on each date, then left-join into `features`. Shared by fundamentals and
+    insider-trading joins below.
+    """
+    if not panel_path.exists():
+        logger.info("No %s found — skipping %s features", panel_path, label)
+        return features
+
+    logger.info("Joining %s features ...", label)
+    panel = pd.read_parquet(panel_path)
+    panel = panel.reset_index()
+    panel["date"] = pd.to_datetime(panel["date"])
+    panel = panel.set_index(["date", "ticker"])
+
+    cols = list(panel.columns)
+    wide = panel.unstack(level="ticker")   # (date, feature-ticker wide)
+    ranked_frames = []
+    for col in cols:
+        if col in wide.columns.get_level_values(0):
+            w = wide[col]                  # date × ticker
+            ranked = rank_normalize(w)      # cross-sectional rank
+            ranked.index.name = "date"
+            s = ranked.stack(future_stack=True)
+            s.name = col
+            ranked_frames.append(s)
+
+    if not ranked_frames:
+        return features
+
+    ranked = pd.concat(ranked_frames, axis=1)
+    ranked.index.names = ["date", "ticker"]
+    features = features.join(ranked, how="left")
+    logger.info("Added %s columns: %s", label, cols)
+    return features
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default="config/config.yaml")
@@ -46,35 +83,8 @@ def main() -> None:
     logger.info("Computing price features ...")
     features = build_feature_panel(prices, returns, volumes, dates)
 
-    # Join fundamental features if the panel has been built
-    fund_path = processed_dir / "fundamentals_panel.parquet"
-    if fund_path.exists():
-        logger.info("Joining fundamental features ...")
-        fund = pd.read_parquet(fund_path)
-        # Ensure date level is datetime
-        fund = fund.reset_index()
-        fund["date"] = pd.to_datetime(fund["date"])
-        fund = fund.set_index(["date", "ticker"])
-        # Rank-normalize each fundamental feature cross-sectionally on each date
-        # then join into the main panel
-        fund_cols = list(fund.columns)
-        fund_wide = fund.unstack(level="ticker")   # (date, feature-ticker wide)
-        fund_ranked_frames = []
-        for col in fund_cols:
-            if col in fund_wide.columns.get_level_values(0):
-                wide = fund_wide[col]              # date × ticker
-                ranked = rank_normalize(wide)      # cross-sectional rank
-                ranked.index.name = "date"
-                s = ranked.stack(future_stack=True)
-                s.name = col
-                fund_ranked_frames.append(s)
-        if fund_ranked_frames:
-            fund_ranked = pd.concat(fund_ranked_frames, axis=1)
-            fund_ranked.index.names = ["date", "ticker"]
-            features = features.join(fund_ranked, how="left")
-            logger.info("Added fundamental columns: %s", fund_cols)
-    else:
-        logger.info("No fundamentals_panel.parquet found — skipping fundamental features")
+    features = _join_ranked_panel(features, processed_dir / "fundamentals_panel.parquet", "fundamental")
+    features = _join_ranked_panel(features, processed_dir / "insider_panel.parquet", "insider")
 
     logger.info(
         "Feature panel: %d observations  %d tickers  %d features",

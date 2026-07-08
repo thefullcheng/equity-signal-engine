@@ -125,6 +125,35 @@ features" — it's that the underlying signal is too weak for feature selection
 to meaningfully discriminate at all, which is the same conclusion the
 permutation test already reached from a different angle.
 
+**New feature tested and rejected: insider trading (Form 4).** Built a
+point-in-time panel from SEC's bulk quarterly Form 3/4/5 datasets
+(`src/data/insider.py`), filtered to genuine open-market purchases/sales only
+(`TRANS_CODE` in `{P, S}` — excludes option exercises, tax withholding,
+grants, gifts, which carry no signal about an insider's actual view), using
+filing date as the point-in-time availability date (Form 4 has a strict
+2-business-day filing deadline, a much tighter lag than the fundamentals
+issue fixed earlier). Feature: net buy/sell count ratio over a trailing
+90-day window.
+
+Validated with the same held-out methodology as the feature-pruning
+investigation above, *before* deciding whether to add it:
+
+| Window | insider_score IC t-stat |
+|---|---|
+| Selection window (pre-2020) | **-0.32** |
+| Holdout (2020-2026) | 0.50 |
+| Full period | 0.06 |
+
+Doesn't clear the same bar (|t|≥0.5 on the selection window) applied to every
+other feature — the selection-window t-stat is negative. **Not added to the
+model.** Deliberately didn't try alternate constructions (different window
+lengths, dollar-weighting, restricting to officers/directors) after seeing
+this result — iterating until some variant clears the bar is exactly the
+in-sample selection problem this section exists to avoid. The panel-building
+code and cached data remain in the repo if a differently-motivated
+construction is worth testing later, decided in advance rather than reverse-
+engineered from a result.
+
 ## Phases completed
 
 - [x] **2a** Point-in-time S&P 500 universe (Wikipedia change log, backward reconstruction)
@@ -149,6 +178,8 @@ permutation test already reached from a different angle.
 - [x] **6g** Dev-mode robustness test against random 100-ticker subsets — see Dev mode section
 - [x] **6h** Momentum-only baseline and permutation null test — see Statistical significance
 - [x] **6i** Investigated in-sample feature pruning via held-out selection window — see Statistical significance
+- [x] **6j** Multi-strategy/multi-account paper trading — momentum-only baseline running in parallel with the full model, on separate Alpaca accounts (`--strategy`/`--account` in `src/trading/`)
+- [x] **6k** Built and tested an insider-trading (Form 4) feature; rejected after held-out validation — see Statistical significance
 
 ## Feature set (5 features, all rank-normalised cross-sectionally)
 
@@ -195,14 +226,16 @@ py -m src.data.build_universe
 py -m src.data.build_prices
 py -m src.data.build_clean
 py -m src.data.build_fundamentals            # ~10 min, SEC EDGAR
+py -m src.data.build_insider                 # optional -- built & tested, not used by the model (see Statistical significance)
 py -m src.features.build_features
 py -m src.labels.build_labels
 py -m src.models.build_model
 py -m src.backtest.build_backtest            # prints attribution tearsheet
 py -m src.backtest.sensitivity               # parameter sensitivity table
 py -m src.signal.build_live_signal           # today's portfolio holdings
+py -m src.signal.build_momentum_signal       # momentum-only baseline signal
 
-# Paper-trade the live signal via Alpaca (dry run by default):
+# Paper-trade via Alpaca (dry run by default; --strategy model|momentum):
 py -m src.trading.rebalance                  # prints order plan only
 py -m src.trading.rebalance --execute        # submits orders
 ```
