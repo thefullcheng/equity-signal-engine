@@ -100,12 +100,51 @@ IC, repeated 2,000 times to build a null distribution:
 **This does not clear conventional significance (p < 0.05).** The observed
 IC is directionally positive and beats ~91% of random permutations, but a
 p-value of 0.089 means we can't confidently rule out that this is a good
-draw from noise rather than genuine, generalizable predictive skill. Combined
-with the momentum-only comparison above, the fair summary of this whole
-project is: **rigorous, correctly-built infrastructure (point-in-time
-universe, walk-forward validation, EDGAR integration) surfacing a weak signal
-that is suggestive but not statistically confirmed** — not a validated
-trading edge.
+draw from noise rather than genuine, generalizable predictive skill.
+
+**Full-strategy permutation null (Sharpe, not just IC).** The IC test above
+checks raw ranking accuracy; a separate question is whether the *complete,
+cost-inclusive strategy* — top-20% selection, 10bps costs, actual turnover —
+beats naive random stock-picking. Ran the exact same portfolio construction
+on 1,000 random rankings (shuffled scores, not just shuffled IC pairings):
+
+| | Value |
+|---|---|
+| Observed Sharpe | 0.665 |
+| Null distribution mean | 0.44 |
+| Null distribution std | 0.043 |
+| **Empirical p-value** (P(null Sharpe ≥ observed)) | **< 0.001** |
+| Observed Sharpe's percentile in the null | 100th (beats all 1,000) |
+
+This clears significance decisively — but two things temper what it actually
+means. First, the null mean is 0.44, not 0, because even a fully random
+75-name long-only S&P 500 portfolio captures real market beta over this bull
+market; this tests "beats random stock-picking," not "beats doing nothing."
+Second, and more important: **turnover explains a real chunk of this gap,
+separate from ranking skill.** The model's picks come from slow-moving
+features (12-month momentum, ROE), so month-to-month selections overlap
+heavily — 40% turnover vs. ~158% for fully-reshuffled random rankings, a
+real cost-drag difference, not a predictive-accuracy difference. So the
+honest reconciliation of the two null tests: raw period-by-period ranking
+accuracy is marginal (IC p=0.089), but the full strategy's persistence in
+its picks (low turnover) gives it a genuine, structural cost advantage over
+naive high-turnover random selection (Sharpe p<0.001). Both are true; they
+answer different questions, and neither alone is the whole picture.
+
+(This test also caught a real bug in its own construction: an early version
+used `.stack(future_stack=True)` without dropping the resulting NaN padding,
+silently breaking the top-quintile selection for most permutations and
+producing an invalid p=0.007. Caught via a turnover sanity check — the
+buggy version showed ~0.05 average turnover for "fully random" rankings,
+implausible for genuine reshuffling — fixed, and the corrected run is what's
+reported above.)
+
+Combined with the momentum-only comparison above, the fair summary of this
+whole project is: **rigorous, correctly-built infrastructure (point-in-time
+universe, walk-forward validation, EDGAR integration) surfacing a real
+cost/turnover advantage and a directionally positive but not conventionally
+significant ranking signal** — suggestive, structurally sound, but not a
+fully validated trading edge.
 
 **Feature selection was in-sample — tested whether fixing that changes the
 conclusion; it doesn't.** Both the original 8→5 trim and the earlier Phase 4b
@@ -189,6 +228,8 @@ engineered from a result.
 - [x] **6i** Investigated in-sample feature pruning via held-out selection window — see Statistical significance
 - [x] **6j** Multi-strategy/multi-account paper trading — momentum-only baseline running in parallel with the full model, on separate Alpaca accounts (`--strategy`/`--account` in `src/trading/`)
 - [x] **6k** Built and tested an insider-trading (Form 4) feature; rejected after held-out validation — see Statistical significance
+- [x] **6l** Added turnover metric, equity curve chart, CI, and reproduction note (results table, `docs/equity_curve.png`, `.github/workflows/`)
+- [x] **6m** Full-strategy Sharpe permutation null (1,000 random rankings, exact portfolio construction + costs) — see Statistical significance
 
 ## Feature set (5 features, all rank-normalised cross-sectionally)
 
