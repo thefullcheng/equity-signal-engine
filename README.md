@@ -80,6 +80,7 @@ see **Sensitivity summary**.
 - [x] **6d** Fixed live signal generation always lagging ~1 rebalance cycle behind reality regardless of data freshness (`predict_latest()` in `src/models/model.py`)
 - [x] **6e** Alpaca paper-trading integration (`src/trading/`) — dry-run by default, equal-weight rebalance to the model's top-N
 - [x] **6f** Fixed walk-forward embargo gap — see Key design decisions
+- [x] **6g** Dev-mode robustness test against random 100-ticker subsets — see Dev mode section
 
 ## Feature set (5 features, all rank-normalised cross-sectionally)
 
@@ -173,11 +174,26 @@ practical impact, but it's a known, undodged limitation of the data source.
 
 **Dev mode** (`universe.mode: dev`): restricts each date's universe to the
 top-100 tickers by trailing dollar volume, for fast iteration. Its metrics
-run meaningfully hotter than full-universe (e.g. IC t-stat ~2 vs ~0.5) —
-diagnosed this as partly a real liquidity effect and partly overfitting to a
-small, persistent, recurring set of the same ~100-150 mega-cap names across
-13 years. Full mode (the default) is the honest result to report; dev mode is
-for fast local iteration only, not a claim about signal quality.
+run meaningfully hotter than full-universe. Tested whether this was
+overfitting to that specific liquid subset vs. a general small-sample effect
+by rerunning on three genuinely random 100-ticker draws:
+
+| Universe | IC t-stat | Sharpe | CAGR |
+|---|---|---|---|
+| Dev-mode (top-100-by-liquidity) | 0.87 | 0.753 | 13.7% |
+| Random-100 (seed=42) | 1.03 | 0.542 | 7.9% |
+| Random-100 (seed=123) | 1.57 | 0.564 | 9.6% |
+| Random-100 (seed=7) | 0.76 | 0.885 | 14.5% |
+| **Full universe (607, honest number)** | **0.48** | **0.665** | **10.0%** |
+
+IC doesn't vanish on random subsets — comparable to or higher than the
+liquidity-selected one — which rules out the narrowest overfitting concern
+(features/model curve-fit specifically to that original recurring ~100-name
+set). But every 100-ticker sample, however chosen, shows noisier IC and a
+nearly 2x Sharpe spread (0.54–0.89) purely from which 100 companies happen to
+be in the sample. Dev mode was never a stable estimate of anything, for any
+100-ticker subset — full mode is the only credible number to report; dev mode
+is for fast local iteration only.
 
 ## Known limitations (not yet addressed)
 
@@ -192,11 +208,6 @@ for fast local iteration only, not a claim about signal quality.
   *same* 2013–2026 span the backtest reports performance over — textbook
   in-sample feature selection. A held-out window for feature decisions would
   fix this; not yet done.
-- **Dev-mode overfitting hypothesis untested directly.** The liquidity-based
-  diagnosis above is circumstantial. A direct test — rerun dev mode on a
-  *different* random 100-ticker subset, not the top-100-by-liquidity one —
-  would confirm whether the effect is genuine size/liquidity signal or
-  fitting to that specific subset's quirks. Not yet run.
 
 ## Survivorship bias handling
 
