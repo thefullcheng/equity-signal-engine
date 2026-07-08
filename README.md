@@ -5,6 +5,18 @@
 Cross-sectional monthly long-only equity strategy on a point-in-time S&P 500
 universe with an overfitting-resistant walk-forward backtest.
 
+**Contents**: [Results](#results-as-of-latest-run) ·
+[Decomposition](#decomposition-how-much-is-the-model-actually-contributing) ·
+[Factor regression](#factor-regression-is-this-just-known-factor-exposure) ·
+[Sector exposure](#sector-exposure-is-this-just-long-tech) ·
+[Statistical significance](#statistical-significance-is-this-distinguishable-from-luck) ·
+[Phases completed](#phases-completed) ·
+[Feature set](#feature-set-5-features-all-rank-normalised-cross-sectionally) ·
+[Sensitivity summary](#sensitivity-summary) ·
+[Quickstart](#quickstart) ·
+[Key design decisions](#key-design-decisions) ·
+[Survivorship bias handling](#survivorship-bias-handling)
+
 ## Results (as of latest run)
 
 *Reproduce these exact numbers*: `config/config.yaml` with `universe.mode: full`,
@@ -17,12 +29,26 @@ Numbers will drift on a fresh data pull as prices/fundamentals update.
 | CAGR | **10.0%** |
 | Ann. volatility | 16.5% |
 | Max drawdown | -31.4% |
-| Hit rate | 67.5% |
-| Avg turnover (per rebalance / annualized) | 40.2% / 523% |
+| Hit rate (strategy / benchmark) | 67.5% / 66.3% |
+| Avg turnover (per rebalance / annualized, two-sided\*) | 40.2% / 523% |
+| Annualized cost drag | 0.52%/yr |
 | IC (model vs realized) | +0.0050 (t = 0.48) |
 | Excess return vs equal-weight BM | +1.46% / yr |
 | Backtest period | 2013 – 2026 (169 periods) |
 | Universe | Full point-in-time S&P 500 (607 current members, 814 ever-members) |
+
+\* Turnover here is two-sided (sum of `\|weight_new - weight_old\|` — a full
+portfolio replacement reads as 2.0, not 1.0), and the 10bps cost is applied
+directly to that two-sided figure once (10bps per side is already baked in,
+not 10bps applied twice). The 523%/yr annualized turnover number therefore
+implies 0.52%/yr of cost drag, not ~1%/yr — worth being precise about, since
+the two-sided-vs-one-sided distinction is an easy way to double- or
+half-count this.
+
+The **benchmark's hit rate (66.3%) is nearly identical to the strategy's
+(67.5%)** — a reminder that "positive most months" is what any long-only
+strategy does in a rising market, not evidence of stock-picking skill on
+its own.
 
 **The excess return and Sharpe gap above are point estimates from 169
 periods, not precise measurements.** 95% block-bootstrap CIs: excess return
@@ -332,6 +358,7 @@ engineered from a result.
 - [x] **6n** Fama-French 5 + momentum factor regression — see Factor regression
 - [x] **6o** Block-bootstrap CI on the headline excess-return/Sharpe-gap claims — see Statistical significance
 - [x] **6p** Sector exposure table + re-verified sector-neutral Sharpe cost (0.54 -> 0.135 on the current model) — see Sector exposure
+- [x] **6q** Benchmark hit rate, precise cost-drag math, log-scale equity curve, table of contents
 
 ## Feature set (5 features, all rank-normalised cross-sectionally)
 

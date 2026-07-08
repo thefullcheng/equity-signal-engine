@@ -33,8 +33,9 @@ def plot_report(
             ax=axes[0], color="grey", linewidth=1.1, linestyle="--",
             label="Equal-weight benchmark",
         )
-    axes[0].set_title("Equity Curve (net of transaction costs)")
+    axes[0].set_title("Equity Curve (net of transaction costs, log scale)")
     axes[0].set_ylabel("Cumulative return")
+    axes[0].set_yscale("log")
     axes[0].axhline(1.0, color="black", linewidth=0.5, linestyle="--")
     axes[0].legend()
 
