@@ -57,8 +57,10 @@ Two things this shows plainly:
 2. **The model beats passive buy-and-hold on this specific historical sample**
    — (c) beats (a) by both Sharpe and absolute return. Whether that's a real,
    generalizable edge or a good draw from noise is a separate question — see
-   **Statistical significance** below, where the honest answer is "not
-   confidently distinguishable from luck."
+   **Statistical significance** and **Factor regression** below. The honest
+   answer, once you control for known factor exposures rather than just raw
+   buy-and-hold, is worse than "not confidently distinguishable from luck" —
+   it's a significantly *negative* risk-adjusted alpha.
 
 **A bug this decomposition surfaced**: the original regime filter averaged
 raw *price levels* across the universe (`prices.mean(axis=1)`) rather than
@@ -68,6 +70,45 @@ $500 stock moved it 100x more than a $5 stock for the same % move). Fixed in
 200-day window — which happened to sit at the top of its own sensitivity
 sweep under the old (buggy) index — no longer looks favorable at any window;
 see **Sensitivity summary**.
+
+## Factor regression: is this just known factor exposure?
+
+The decomposition above answers "model vs. no model." The industry-standard
+version of that question is a factor regression: does the strategy's return
+survive controlling for the Fama-French 5 factors (market, size, value,
+profitability, investment) plus momentum? Daily factor data from Ken
+French's data library, compounded to match each backtest period's exact
+date range (`src/backtest/factor_data.py`, `build_factor_regression.py`).
+
+| Factor | Coefficient | t-stat | p-value |
+|---|---|---|---|
+| Alpha (period) | -0.0044 | **-4.79** | <0.001 |
+| Mkt-RF | 1.036 | 42.78 | <0.001 |
+| SMB (size) | 0.110 | 2.78 | 0.006 |
+| HML (value) | -0.058 | -1.63 | 0.105 |
+| RMW (profitability) | 0.187 | 3.96 | <0.001 |
+| CMA (investment) | 0.071 | 1.17 | 0.243 |
+| MOM (momentum) | 0.083 | 3.03 | 0.003 |
+
+R² = 0.943 (adj. 0.941), n = 168 periods. **Annualized alpha: -5.56%/yr,
+strongly significant.**
+
+Exactly the exposures you'd expect given the feature set: near-1.0 market
+beta (long-only, always invested), significant profitability tilt (RMW —
+this is `roe`/`gross_prof`), significant momentum tilt (MOM — this is
+`mom_12_1`), and a smaller size tilt. 94% of the strategy's return variance
+is explained by six well-known, freely-investable factors. **The residual
+— the part attributable to this specific model's stock selection, beyond
+just having those tilts — is significantly *negative***, not merely
+insignificant. Checked whether this is a transaction-cost artifact: gross
+(pre-cost) alpha is -5.06%/yr (t=-4.35), barely different from the
+cost-inclusive -5.56%/yr — this isn't costs, the specific stocks chosen
+within the factor tilts underperform what the tilts alone would predict,
+even before paying to trade them.
+
+This is the most direct answer yet to "isn't this just momentum beta in ML
+clothing?" — yes, and once you control for that, there's no stock-picking
+skill left to find.
 
 ## Statistical significance: is this distinguishable from luck?
 
@@ -139,12 +180,16 @@ buggy version showed ~0.05 average turnover for "fully random" rankings,
 implausible for genuine reshuffling — fixed, and the corrected run is what's
 reported above.)
 
-Combined with the momentum-only comparison above, the fair summary of this
-whole project is: **rigorous, correctly-built infrastructure (point-in-time
-universe, walk-forward validation, EDGAR integration) surfacing a real
-cost/turnover advantage and a directionally positive but not conventionally
-significant ranking signal** — suggestive, structurally sound, but not a
-fully validated trading edge.
+Combined with the momentum-only comparison and the factor regression above,
+the fair summary of this whole project is: **rigorous, correctly-built
+infrastructure (point-in-time universe, walk-forward validation, EDGAR
+integration) that outperforms naive random stock-picking largely through
+known factor exposures (market beta, profitability, momentum) and lower
+turnover, not novel stock-selection skill — and once those factors are
+controlled for, the residual alpha is significantly negative, not merely
+insignificant.** This is a well-built research pipeline that correctly
+identifies its own strategy as a repackaging of established factors rather
+than a validated edge.
 
 **Feature selection was in-sample — tested whether fixing that changes the
 conclusion; it doesn't.** Both the original 8→5 trim and the earlier Phase 4b
@@ -230,6 +275,7 @@ engineered from a result.
 - [x] **6k** Built and tested an insider-trading (Form 4) feature; rejected after held-out validation — see Statistical significance
 - [x] **6l** Added turnover metric, equity curve chart, CI, and reproduction note (results table, `docs/equity_curve.png`, `.github/workflows/`)
 - [x] **6m** Full-strategy Sharpe permutation null (1,000 random rankings, exact portfolio construction + costs) — see Statistical significance
+- [x] **6n** Fama-French 5 + momentum factor regression — see Factor regression
 
 ## Feature set (5 features, all rank-normalised cross-sectionally)
 
@@ -282,6 +328,7 @@ py -m src.labels.build_labels
 py -m src.models.build_model
 py -m src.backtest.build_backtest            # prints attribution tearsheet
 py -m src.backtest.sensitivity               # parameter sensitivity table
+py -m src.backtest.build_factor_regression   # Fama-French 5 + momentum regression
 py -m src.signal.build_live_signal           # today's portfolio holdings
 py -m src.signal.build_momentum_signal       # momentum-only baseline signal
 
