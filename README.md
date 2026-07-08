@@ -24,6 +24,11 @@ Numbers will drift on a fresh data pull as prices/fundamentals update.
 | Backtest period | 2013 – 2026 (169 periods) |
 | Universe | Full point-in-time S&P 500 (607 current members, 814 ever-members) |
 
+**The excess return and Sharpe gap above are point estimates from 169
+periods, not precise measurements.** 95% block-bootstrap CIs: excess return
+[-0.91%, +3.79%]/yr, Sharpe gap [-0.13, +0.25] — both span zero. See
+**Statistical significance** for methodology and robustness checks.
+
 ![Equity curve, drawdown, and IC over time](docs/equity_curve.png)
 
 Strategy: long top-20% by model score, 20-day rebalance, no market-timing
@@ -111,6 +116,24 @@ clothing?" — yes, and once you control for that, there's no stock-picking
 skill left to find.
 
 ## Statistical significance: is this distinguishable from luck?
+
+**Block-bootstrap CI on the headline comparison.** The Results table states
+"+1.46%/yr excess" and the Decomposition table shows "Sharpe 0.665 vs.
+0.570" as if they were precise measurements — with only 169 non-overlapping
+periods, they aren't. Used a circular moving-block bootstrap (not iid
+resampling, to preserve any serial dependence — performance can cluster in
+trending vs. choppy regimes) on the strategy-minus-benchmark return series,
+2,000 draws, block length ≈ 1 year (13 periods):
+
+| | Mean | 95% CI | P(> 0) |
+|---|---|---|---|
+| Annualized excess return | +1.51%/yr | [-0.91%, +3.79%]/yr | 89.8% |
+| Sharpe gap (strategy - benchmark) | +0.087 | [-0.13, +0.25] | 82.3% |
+
+**Both intervals span zero.** Checked robustness to the block-length choice
+(6, 13, 20, 30 periods) — the conclusion doesn't change; all four give
+similar means and all four CIs span zero. `src/backtest/bootstrap.py`,
+`build_bootstrap_ci.py`.
 
 **Momentum-only baseline.** A naive 12-1 month momentum sort (no model, no
 fundamentals, no LightGBM) over the identical 169 periods:
@@ -276,6 +299,7 @@ engineered from a result.
 - [x] **6l** Added turnover metric, equity curve chart, CI, and reproduction note (results table, `docs/equity_curve.png`, `.github/workflows/`)
 - [x] **6m** Full-strategy Sharpe permutation null (1,000 random rankings, exact portfolio construction + costs) — see Statistical significance
 - [x] **6n** Fama-French 5 + momentum factor regression — see Factor regression
+- [x] **6o** Block-bootstrap CI on the headline excess-return/Sharpe-gap claims — see Statistical significance
 
 ## Feature set (5 features, all rank-normalised cross-sectionally)
 
@@ -329,6 +353,7 @@ py -m src.models.build_model
 py -m src.backtest.build_backtest            # prints attribution tearsheet
 py -m src.backtest.sensitivity               # parameter sensitivity table
 py -m src.backtest.build_factor_regression   # Fama-French 5 + momentum regression
+py -m src.backtest.build_bootstrap_ci        # block-bootstrap CI on excess return / Sharpe gap
 py -m src.signal.build_live_signal           # today's portfolio holdings
 py -m src.signal.build_momentum_signal       # momentum-only baseline signal
 
