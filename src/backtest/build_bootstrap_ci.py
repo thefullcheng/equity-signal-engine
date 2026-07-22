@@ -40,7 +40,7 @@ def main() -> None:
     predictions = pd.read_parquet(processed_dir / "predictions.parquet")
     labels = pd.read_parquet(processed_dir / "labels.parquet")
     port_returns = run_backtest(predictions, labels, costs_bps=cfg["costs"]["per_side_bps"],
-                                top_q=0.20, long_only=True)
+                                top_q=cfg["portfolio"]["top_q"], long_only=True)
 
     bmark = labels.groupby(level="date")["fwd_return"].mean()
 

@@ -49,6 +49,7 @@ def main() -> None:
     cfg = yaml.safe_load(Path(args.config).read_text())
     processed_dir = Path(cfg["data"]["processed_dir"])
     costs_bps     = cfg["costs"]["per_side_bps"]
+    top_q         = cfg["portfolio"]["top_q"]
 
     predictions   = pd.read_parquet(processed_dir / "predictions.parquet")
     labels        = pd.read_parquet(processed_dir / "labels.parquet")
@@ -65,8 +66,8 @@ def main() -> None:
 
     horizon = cfg["labels"]["horizon_days"]
     periods_per_year = int(round(252 / horizon))
-    logger.info("Running backtest (costs: %d bps, long-only, %d-day hold, no regime filter) ...",
-                costs_bps, horizon)
+    logger.info("Running backtest (costs: %d bps, top_q=%.2f, long-only, %d-day hold, "
+                "no regime filter) ...", costs_bps, top_q, horizon)
     # No regime/market-timing filter: a 200d-SMA cash overlay was tested and
     # dropped -- once built on a correct equal-weight return index (see
     # src/backtest/sensitivity.py and equal_weight_index()), it reduced Sharpe
@@ -82,7 +83,7 @@ def main() -> None:
     # the model changes, this number moves a lot (was ~0.54 mid-session
     # under an earlier, buggier configuration). See README, Factor
     # regression / sector exposure.
-    port_returns = run_backtest(predictions, labels, costs_bps=costs_bps, long_only=True)
+    port_returns = run_backtest(predictions, labels, costs_bps=costs_bps, top_q=top_q, long_only=True)
 
     metrics = compute_metrics(port_returns, periods_per_year=periods_per_year)
     logger.info("Performance summary:")
@@ -111,7 +112,7 @@ def main() -> None:
     logger.info("Ann excess return vs benchmark:    %.4f", excess_ann)
 
     print_attribution(port_returns, predictions, sectors,
-                      periods_per_year=periods_per_year)
+                      periods_per_year=periods_per_year, top_q=top_q)
 
     bt_path = processed_dir / "backtest.parquet"
     port_returns.to_parquet(bt_path)

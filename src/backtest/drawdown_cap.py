@@ -49,7 +49,7 @@ def main() -> None:
     returns_panel.index = pd.to_datetime(returns_panel.index)
 
     baseline_bt = run_backtest(predictions, labels, costs_bps=costs_bps,
-                                top_q=0.20, long_only=True)
+                                top_q=cfg["portfolio"]["top_q"], long_only=True)
     baseline_m  = compute_metrics(baseline_bt, periods_per_year=ppy)
 
     grid_window = [100, 150, 200, 250]
@@ -72,7 +72,7 @@ def main() -> None:
         for f in grid_floor:
             exp = trend_exposure(returns_panel, window=w, floor=f)
             bt  = run_backtest(predictions, labels, costs_bps=costs_bps,
-                               top_q=0.20, long_only=True, exposure=exp)
+                               top_q=cfg["portfolio"]["top_q"], long_only=True, exposure=exp)
             m   = compute_metrics(bt, periods_per_year=ppy)
             key = f"window={w} floor={f}"
             bts[(w, f)] = bt

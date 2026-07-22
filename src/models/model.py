@@ -15,6 +15,7 @@ import logging
 
 import lightgbm as lgb
 import pandas as pd
+from sklearn.linear_model import Ridge
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +40,23 @@ PARAMS: dict = {
     "verbose":          -1,
 }
 
+# Comparison baseline for "is the nonlinearity/complexity of LightGBM
+# actually earning its keep": a plain linear model on the identical
+# features/labels/walk-forward split. No separate feature scaling needed --
+# features are already cross-sectionally rank-normalized to [0,1] by
+# build_features.py's rank_normalize(), so they're on a comparable scale
+# already. alpha=1.0 is an unremarkable default, not tuned (same "no
+# hyperparameter search on test data" discipline as the LightGBM params).
+RIDGE_PARAMS: dict = {"alpha": 1.0, "random_state": 42}
+
+
+def _make_model(model_type: str, params: dict):
+    if model_type == "lightgbm":
+        return lgb.LGBMRegressor(**params)
+    if model_type == "ridge":
+        return Ridge(**{k: v for k, v in params.items() if k != "random_state"})
+    raise ValueError(f"Unknown model_type: {model_type!r} (expected 'lightgbm' or 'ridge')")
+
 
 def _apply_dev_filter(data: pd.DataFrame, top_n: int) -> pd.DataFrame:
     """Keep only top-N tickers by dollar_vol_60 on each rebalance date."""
@@ -53,8 +71,10 @@ def walk_forward_predict(
     features: pd.DataFrame,
     labels: pd.DataFrame,
     initial_train_end: str,
-    params: dict = PARAMS,
+    params: dict | None = None,
     dev_top_n: int | None = None,
+    model_type: str = "lightgbm",
+    drop_na_features: bool | None = None,
 ) -> pd.DataFrame:
     """Walk-forward predictions with annual re-fitting on an expanding window.
 
@@ -63,13 +83,34 @@ def walk_forward_predict(
     features          : (date, ticker) MultiIndex, columns = feature names
     labels            : (date, ticker) MultiIndex, column 'fwd_return'
     initial_train_end : last date (inclusive) in the first training window
-    params            : LightGBM params — fixed, not tuned on test data
+    params            : model params — fixed, not tuned on test data. Defaults
+                        to PARAMS or RIDGE_PARAMS based on model_type.
     dev_top_n         : if set, restrict universe to top-N by dollar_vol_60
+    model_type        : "lightgbm" (default) | "ridge" -- same features,
+                        labels, and expanding-window/embargo discipline
+                        either way, so a Sharpe/IC gap between the two is
+                        attributable to the model class, not the setup.
+    drop_na_features  : if True, drop any row with a NaN feature before
+                        train/predict (required for non-tree models, which
+                        can't fit through NaN the way LightGBM's native
+                        missing-value splits can). Defaults to True unless
+                        model_type=="lightgbm". Pass True explicitly with
+                        model_type="lightgbm" to compare architectures on
+                        an identical row set instead of LightGBM's full,
+                        NaN-inclusive one -- otherwise a Sharpe/IC gap
+                        against a dropna'd model conflates model class with
+                        sample composition (EDGAR fundamentals coverage is
+                        far from complete, so this is a large effect, not a
+                        rounding error -- see model_comparison.py).
 
     Returns
     -------
     DataFrame with MultiIndex (date, ticker) and column 'score'.
     """
+    if params is None:
+        params = PARAMS if model_type == "lightgbm" else RIDGE_PARAMS
+    if drop_na_features is None:
+        drop_na_features = model_type != "lightgbm"
     data = features.join(labels, how="inner").dropna(subset=["fwd_return"])
     if dev_top_n is not None:
         data = _apply_dev_filter(data, top_n=dev_top_n)
@@ -77,6 +118,19 @@ def walk_forward_predict(
     # Use only the feature columns that are actually present in the panel
     feat_cols = [c for c in FEATURE_COLS if c in data.columns]
     logger.info("Using %d features: %s", len(feat_cols), feat_cols)
+
+    if drop_na_features:
+        # LightGBM splits on missing values natively; a linear model can't
+        # fit or predict through a NaN feature at all. Drop rather than
+        # impute -- imputing would inject an assumption (e.g. "missing ==
+        # average rank") this comparison isn't set up to justify.
+        before = len(data)
+        data = data.dropna(subset=feat_cols)
+        dropped = before - len(data)
+        if dropped:
+            logger.info("drop_na_features=True (model_type=%s): dropped %d/%d "
+                        "rows with NaN features (%.1f%%).", model_type, dropped,
+                        before, 100 * dropped / before)
 
     all_dates = data.index.get_level_values("date").unique().sort_values()
     cutoff = pd.Timestamp(initial_train_end)
@@ -108,7 +162,7 @@ def walk_forward_predict(
             logger.warning("Year %d: only %d training rows — skipping", year, len(train))
             continue
 
-        model = lgb.LGBMRegressor(**params)
+        model = _make_model(model_type, params)
         model.fit(train[feat_cols], train["fwd_return"])
         logger.info("Year %d: trained on %d obs", year, len(train))
 

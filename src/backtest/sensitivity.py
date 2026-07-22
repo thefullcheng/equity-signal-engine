@@ -48,7 +48,8 @@ def main() -> None:
 
     # No regime filter by default -- see build_backtest.py for why it was
     # dropped. Kept here as an explicit, opt-in variation to explore.
-    base = dict(top_q=0.20, costs_bps=cfg["costs"]["per_side_bps"], regime_window=None)
+    base = dict(top_q=cfg["portfolio"]["top_q"], costs_bps=cfg["costs"]["per_side_bps"],
+                regime_window=None)
 
     rows = []
 

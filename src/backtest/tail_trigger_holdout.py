@@ -66,7 +66,7 @@ def main() -> None:
     returns_panel.index = pd.to_datetime(returns_panel.index)
 
     baseline_bt = run_backtest(predictions, labels, costs_bps=costs_bps,
-                                top_q=0.20, long_only=True)
+                                top_q=cfg["portfolio"]["top_q"], long_only=True)
 
     grid_lookback  = [10, 20, 40]
     grid_threshold = [0.08, 0.10, 0.15, 0.20]
@@ -80,7 +80,7 @@ def main() -> None:
             for fl in grid_floor:
                 exp = drawdown_trigger_exposure(returns_panel, lookback=lb, threshold=th, floor=fl)
                 bt  = run_backtest(predictions, labels, costs_bps=costs_bps,
-                                   top_q=0.20, long_only=True, exposure=exp)
+                                   top_q=cfg["portfolio"]["top_q"], long_only=True, exposure=exp)
                 bts[(lb, th, fl)] = bt
                 sel_m = _metrics_on_slice(bt, ppy, end=HOLDOUT_START)
                 rows.append({"lookback": lb, "threshold": th, "floor": fl,

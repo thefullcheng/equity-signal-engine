@@ -41,14 +41,16 @@ def main() -> None:
     horizon       = cfg["labels"]["horizon_days"]
     ppy           = int(round(252 / horizon))
 
+    top_q         = cfg["portfolio"]["top_q"]
+
     predictions   = pd.read_parquet(processed_dir / "predictions.parquet")
     labels        = pd.read_parquet(processed_dir / "labels.parquet")
     returns_panel = pd.read_parquet(processed_dir / "returns.parquet")
     returns_panel.index = pd.to_datetime(returns_panel.index)
 
-    # Baseline (current default): model, top_q=0.2, no timing overlay at all.
+    # Baseline (current default): model, top_q from config, no timing overlay.
     baseline_bt = run_backtest(predictions, labels, costs_bps=costs_bps,
-                                top_q=0.20, long_only=True)
+                                top_q=top_q, long_only=True)
     baseline_m  = compute_metrics(baseline_bt, periods_per_year=ppy)
 
     # Full-universe equal-weight benchmark, no overlay -- same reference
@@ -88,11 +90,11 @@ def main() -> None:
         })
         return bt
 
-    logger.info("Sweeping vol-scaled MODEL portfolio (top_q=0.20) ...")
+    logger.info("Sweeping vol-scaled MODEL portfolio (top_q=%.2f) ...", top_q)
     model_vol_bts = {}
     for tv in grid_target_vol:
         for w in grid_window:
-            bt = _run(f"model target_vol={tv} window={w}", top_q=0.20, target_vol=tv, window=w)
+            bt = _run(f"model target_vol={tv} window={w}", top_q=top_q, target_vol=tv, window=w)
             model_vol_bts[(tv, w)] = bt
 
     logger.info("Sweeping vol-scaled BENCHMARK (top_q=1.00, equal-weight) ...")

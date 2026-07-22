@@ -69,7 +69,7 @@ def main() -> None:
     labels      = pd.read_parquet(processed_dir / "labels.parquet")
 
     baseline_bt = run_backtest(predictions, labels, costs_bps=costs_bps,
-                                top_q=0.20, long_only=True)
+                                top_q=cfg["portfolio"]["top_q"], long_only=True)
     baseline_sel  = _metrics_on_slice(baseline_bt, ppy, end=HOLDOUT_START)
     baseline_hold = _metrics_on_slice(baseline_bt, ppy, start=HOLDOUT_START)
 
@@ -95,7 +95,7 @@ def main() -> None:
             for fl in GRID_FLOOR:
                 exp = level_trigger_exposure(series, threshold=th, floor=fl)
                 bt  = run_backtest(predictions, labels, costs_bps=costs_bps,
-                                   top_q=0.20, long_only=True, exposure=exp)
+                                   top_q=cfg["portfolio"]["top_q"], long_only=True, exposure=exp)
                 bts[(th, fl)] = bt
                 sel_m = _metrics_on_slice(bt, ppy, end=HOLDOUT_START)
                 rows.append({"threshold": th, "floor": fl,

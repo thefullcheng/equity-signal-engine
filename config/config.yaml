@@ -25,3 +25,17 @@ labels:
 
 costs:
   per_side_bps: 10     # base case; sensitivity run at [5, 10, 20]
+
+portfolio:
+  # Fraction of the universe held long. Was hardcoded 0.20 everywhere (not
+  # actually in this file, despite the header above) until top_q_holdout.py
+  # found 0.20 was itself an in-sample pick from sensitivity.py's full-sample
+  # sweep -- selecting on pre-2020 data only and testing on the untouched
+  # 2020-2026 holdout both prefer 0.15 (holdout Sharpe 0.531 vs 0.478).
+  # Currently wired into build_backtest.py only -- the ~14 other scripts that
+  # hardcode top_q=0.20 (factor regression, sector exposure, bootstrap CIs,
+  # all 5 market-timing overlay holdouts, the LightGBM-vs-Ridge comparison)
+  # are each a specific historical study already published in the README and
+  # have NOT been rerun at 0.15. Don't assume their numbers hold at this
+  # value without rerunning them.
+  top_q: 0.15
